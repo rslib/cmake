@@ -73,6 +73,26 @@
             };
           };
         };
+        rs-cmake = pkgs.stdenv.mkDerivation {
+          pname = "rs-cmake";
+          version = "1.0.0";
+
+          src = ./.;
+
+          dontBuild = true;
+          dontConfigure = true;
+
+          installPhase = ''
+            mkdir -p $out/share/cmake/rs-cmake
+            cp -r cmake/* $out/share/cmake/rs-cmake/
+          '';
+
+          meta = with pkgs.lib; {
+            description = "Reusable CMake modules for C/C++ projects";
+            homepage = "https://github.com/rslib/cmake";
+            license = licenses.mit;
+          };
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -94,6 +114,16 @@
           formatting = treefmtEval.config.build.check self;
           pre-commit-check = pre-commit-check;
         };
+
+        packages = {
+          inherit rs-cmake;
+          default = rs-cmake;
+        };
       }
-    );
+    )
+    // {
+      overlays.default = final: prev: {
+        rs-cmake = self.packages.${prev.system}.rs-cmake;
+      };
+    };
 }
