@@ -1,0 +1,24 @@
+@PACKAGE_INIT@
+
+# rs-cmake - Reusable CMake modules
+#
+# This package provides utility CMake modules for building C/C++ projects.
+#
+# Usage (via find_package after installation):
+#   find_package(rs-cmake REQUIRED)
+#   include(${RS_CMAKE_MODULE_DIR}/LibraryHelpers.cmake)
+#
+# Usage (via CPM/FetchContent):
+#   CPMAddPackage("gh:user/rs-cmake#main")
+#   include(${rs-cmake_SOURCE_DIR}/cmake/LibraryHelpers.cmake)
+#
+# Available modules:
+#   - CPM.cmake              : CPM package manager
+#   - CompilerWarningsHelper.cmake : Compiler warning utilities
+#   - DependencyHelpers.cmake      : Dependency management helpers
+#   - LibraryHelpers.cmake         : Library creation utilities
+
+# Set module directory for installed package
+set(RS_CMAKE_MODULE_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/cmake/rs-cmake/modules")
+
+check_required_components(rs-cmake)
