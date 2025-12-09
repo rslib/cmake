@@ -5,6 +5,58 @@ include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
 #[=[
+Removes include directories of IMPORTED targets from CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES.
+
+This is necessary because CMake strips directories in CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES
+from compile_commands.json, which breaks LSP tools like clangd. This commonly happens
+when using Nix, which adds package include paths as implicit includes.
+
+Call this function after find_package() for any external dependencies whose headers
+need to be visible to LSP tools.
+
+Usage:
+  find_package(some_lib REQUIRED)
+  rs_fix_imported_includes(some_lib::some_lib)
+#]=]
+function(rs_fix_imported_includes)
+  foreach(_target ${ARGN})
+    if(TARGET ${_target})
+      # Resolve ALIAS targets
+      get_target_property(_aliased ${_target} ALIASED_TARGET)
+      if(_aliased)
+        set(_real_target ${_aliased})
+      else()
+        set(_real_target ${_target})
+      endif()
+
+      # Only process IMPORTED targets
+      get_target_property(_imported ${_real_target} IMPORTED)
+      if(_imported)
+        get_target_property(_inc ${_real_target} INTERFACE_INCLUDE_DIRECTORIES)
+        if(_inc)
+          foreach(_dir ${_inc})
+            list(REMOVE_ITEM CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "${_dir}")
+            list(REMOVE_ITEM CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES "${_dir}")
+          endforeach()
+        endif()
+      endif()
+    endif()
+  endforeach()
+
+  # Propagate to parent scope
+  set(
+    CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES
+    "${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES}"
+    PARENT_SCOPE
+  )
+  set(
+    CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES
+    "${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}"
+    PARENT_SCOPE
+  )
+endfunction()
+
+#[=[
 Creates a C library with automatic shared/static variants, complete with:
 - Shared library target (if BUILD_SHARED is ON)
 - Static library target (if BUILD_STATIC is ON)
@@ -116,6 +168,12 @@ function(rs_create_library)
   # Validate required arguments
   if(NOT LIB_NAME)
     message(FATAL_ERROR "rs_create_library: NAME is required")
+  endif()
+
+  # Fix implicit includes for IMPORTED targets in PUBLIC_LINK_LIBRARIES
+  # This ensures their include directories appear in compile_commands.json
+  if(LIB_PUBLIC_LINK_LIBRARIES)
+    rs_fix_imported_includes(${LIB_PUBLIC_LINK_LIBRARIES})
   endif()
 
   if(NOT LIB_NAMESPACE)
@@ -478,6 +536,18 @@ function(rs_create_library)
 
   # Return list of all created targets
   set(${LIB_NAME}_TARGETS ${CREATED_TARGETS} PARENT_SCOPE)
+
+  # Propagate implicit include fixes to parent scope
+  set(
+    CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES
+    "${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES}"
+    PARENT_SCOPE
+  )
+  set(
+    CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES
+    "${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}"
+    PARENT_SCOPE
+  )
 endfunction()
 
 #[=[
